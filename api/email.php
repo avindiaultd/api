@@ -7,9 +7,22 @@ require __DIR__ . '/../vendor/autoload.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Methods: GET, POST');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+// 1. Determine Request Method and Capture Inputs Dynamically
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'POST') {
+    $email       = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
+    $message     = filter_input(INPUT_POST, 'message', FILTER_UNSAFE_RAW);
+    $msgType     = filter_input(INPUT_POST, 'message_type', FILTER_UNSAFE_RAW);
+    $companyName = filter_input(INPUT_POST, 'company_name', FILTER_UNSAFE_RAW);
+} elseif ($method === 'GET') {
+    $email       = filter_input(INPUT_GET, 'email', FILTER_VALIDATE_EMAIL);
+    $message     = filter_input(INPUT_GET, 'message', FILTER_UNSAFE_RAW);
+    $msgType     = filter_input(INPUT_GET, 'message_type', FILTER_UNSAFE_RAW);
+    $companyName = filter_input(INPUT_GET, 'company_name', FILTER_UNSAFE_RAW);
+} else {
     echo json_encode([
         'status' => 'error',
         'message' => 'Invalid Request Method'
@@ -17,12 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 1. Capture and Validate Inputs
-$email       = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
-$message     = filter_input(INPUT_POST, 'message', FILTER_UNSAFE_RAW);
-$msgType     = filter_input(INPUT_POST, 'message_type', FILTER_UNSAFE_RAW);
-$companyName = filter_input(INPUT_POST, 'company_name', FILTER_UNSAFE_RAW);
-
+// Check if all parameters were successfully caught
 if (!$email || !$message || !$msgType || !$companyName) {
     echo json_encode([
         'status' => 'error',
@@ -31,7 +39,7 @@ if (!$email || !$message || !$msgType || !$companyName) {
     exit;
 }
 
-// 2. Determine Theme Variables based on Message Type
+// 2. Determine Theme Layout based on Message Type
 $msgType = strtolower(trim($msgType));
 switch ($msgType) {
     case 'otp':
@@ -57,7 +65,7 @@ switch ($msgType) {
         break;
 }
 
-// Sanitize outputs for HTML rendering
+// Sanitize outputs safely for HTML injection prevention
 $safeMessage     = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
 $safeCompanyName = htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8');
 $safeTitleText   = htmlspecialchars($titleText, ENT_QUOTES, 'UTF-8');
@@ -65,7 +73,7 @@ $safeTitleText   = htmlspecialchars($titleText, ENT_QUOTES, 'UTF-8');
 $mail = new PHPMailer(true);
 
 try {
-    // SMTP Configuration
+    // SMTP Configuration (Uses Vercel Environment Variables)
     $mail->isSMTP();
     $mail->Host       = 'smtp.gmail.com';
     $mail->SMTPAuth   = true;
@@ -78,11 +86,11 @@ try {
     $mail->setFrom(getenv('SMTP_EMAIL'), $safeCompanyName);
     $mail->addAddress($email);
 
-    // Email Content
+    // Email Setup
     $mail->isHTML(true);
     $mail->Subject = "[{$safeCompanyName}] {$safeTitleText}";
 
-    // Handle structural display for OTP vs regular messages
+    // Handle standard layout vs large visual text block for OTPs
     $contentDisplay = ($msgType === 'otp') 
         ? '<div style="margin:30px 0;text-align:center;font-size:42px;font-weight:bold;letter-spacing:8px;color:'.$themeColor.';">'.$safeMessage.'</div>'
         : '<p style="font-size:16px;color:#333333;line-height:1.6;margin:20px 0;">'.$safeMessage.'</p>';
@@ -100,14 +108,12 @@ try {
                 <td align="center" style="padding:30px 15px;">
                     <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.05);">
                         
-                        <!-- Header Banner -->
                         <tr>
                             <td style="background:'.$themeColor.';color:#ffffff;padding:25px;text-align:center;">
                                 <h1 style="margin:0;font-size:26px;font-weight:600;">'.$safeCompanyName.'</h1>
                             </td>
                         </tr>
 
-                        <!-- Content Body -->
                         <tr>
                             <td style="padding:40px;background:#ffffff;">
                                 <h2 style="margin-top:0;color:#222222;font-size:20px;">'.$safeTitleText.'</h2>
@@ -123,7 +129,6 @@ try {
                             </td>
                         </tr>
 
-                        <!-- Footer -->
                         <tr>
                             <td style="background:#f8f8f8;padding:20px;text-align:center;font-size:12px;color:#777777;border-top:1px solid #eeeeee;">
                                 &copy; '.date('Y').' '.$safeCompanyName.'. All rights reserved.
@@ -139,7 +144,7 @@ try {
     </body>
     </html>';
 
-    // Plain text fallback
+    // Plain text alternative
     $mail->AltBody = "[$safeCompanyName] $safeTitleText\n\n" . strip_tags($message) . "\n\nBest regards,\nThe $safeCompanyName Team";
 
     $mail->send();
