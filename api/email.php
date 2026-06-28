@@ -7,7 +7,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST');
+header('Access-Control-Allow-Methods: POST');
 
 // 1. Determine Request Method and Capture Inputs Dynamically
 $method = $_SERVER['REQUEST_METHOD'];
